@@ -12,7 +12,7 @@ An automated ImageJ plugin for processing paired conf405 and conf488 microscopy 
 
 ## Installation
 
-1. Download `Conf405_488_Plugin.zip` from the [Releases](../../releases) page
+1. Download [`Conf405_488_Plugin.zip`](Conf405_488_Plugin.zip)
 2. Extract all `.class` files from the zip
 3. Copy the extracted `.class` files to your ImageJ `plugins/` folder
 4. Restart ImageJ
