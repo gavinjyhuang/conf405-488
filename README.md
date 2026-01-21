@@ -12,55 +12,16 @@ An automated ImageJ plugin for processing paired conf405 and conf488 microscopy 
 
 ## Installation
 
-### Option 1: Download Pre-compiled Plugin (Easiest)
-
-1. Go to the [Releases](../../releases) page
-2. Download `Conf405_488_Plugin.zip` from the latest release
-3. Extract all `.class` files from the zip
-4. Copy all extracted `.class` files to your ImageJ `plugins/` folder:
-   - **Windows**: `C:\Program Files\ImageJ\plugins\`
-   - **Mac**: `/Applications/ImageJ.app/plugins/` or `ImageJ/plugins/`
-   - **Linux**: `~/ImageJ/plugins/`
-5. Restart ImageJ
-6. The plugin will appear in the **Plugins** menu as "Conf405 488"
-
-### Option 2: Build from Source
-
-**Requirements:**
-- Java JDK (version 8 or higher)
-- ImageJ or Fiji installed
-
-**Steps:**
-
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/gavinjyhuang/conf405-488.git
-   cd conf405-488
-   ```
-
-2. Build the plugin:
-
-   **On Mac/Linux:**
-   ```bash
-   ./build.sh
-   ```
-
-   **On Windows or Manual Build:**
-   ```bash
-   javac -cp "/path/to/ImageJ/ij.jar" Conf405_488.java
-   ```
-   
-   Replace `/path/to/ImageJ/ij.jar` with your actual ImageJ jar location:
-   - **Windows**: `C:\Program Files\ImageJ\ij.jar`
-   - **Mac**: `/Applications/ImageJ.app/Contents/Java/ij.jar`
-   - **Fiji**: `/Applications/Fiji.app/jars/ij.jar`
-
-3. Copy all generated `.class` files to your ImageJ `plugins/` folder:
-   ```bash
-   cp Conf405_488*.class /path/to/ImageJ/plugins/
-   ```
-
+1. Download `Conf405_488_Plugin.zip` from the [Releases](../../releases) page
+2. Extract all `.class` files from the zip
+3. Copy the extracted `.class` files to your ImageJ `plugins/` folder
 4. Restart ImageJ
+5. Find "Conf405 488" in the **Plugins** menu
+
+**ImageJ plugins folder locations:**
+- **Windows**: `C:\Program Files\ImageJ\plugins\`
+- **Mac**: `/Applications/ImageJ.app/plugins/`
+- **Linux**: `~/ImageJ/plugins/`
 
 ## Usage
 
