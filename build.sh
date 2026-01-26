@@ -34,17 +34,45 @@ fi
 
 echo "Found ImageJ at: $IMAGEJ_JAR"
 
-# Compile
-javac -cp "$IMAGEJ_JAR" Conf405_488.java
+# Clean previous classes
+rm -f Conf405_488*.class
+
+# Compile targeting Java 8 for Fiji/ImageJ compatibility
+if javac --help 2>/dev/null | grep -q -- "--release"; then
+    # Prefer modern flag to ensure correct bootclasspath and bytecode (major 52)
+    javac --release 8 -cp "$IMAGEJ_JAR" Conf405_488.java
+else
+    # Fallback for older javac versions
+    javac -source 1.8 -target 1.8 -cp "$IMAGEJ_JAR" Conf405_488.java
+fi
 
 if [ $? -eq 0 ]; then
-    echo "Build successful!"
-    echo ""
-    echo "To install:"
-    echo "  1. Copy all Conf405_488*.class files to your ImageJ plugins folder"
-    echo "  2. Restart ImageJ"
-    echo ""
-    ls -lh Conf405_488*.class
+    echo "Class compilation successful!"
+    echo "Packaging JAR..."
+
+    # Create distribution folder
+    DIST_DIR="dist"
+    mkdir -p "$DIST_DIR"
+
+    # Package class files into a JAR for ImageJ
+    JAR_NAME="Conf405_488.jar"
+    jar cf "$DIST_DIR/$JAR_NAME" Conf405_488.class Conf405_488\$1.class Conf405_488\$2.class
+
+    if [ $? -eq 0 ]; then
+        echo "JAR created: $DIST_DIR/$JAR_NAME"
+        echo ""
+        echo "To install (recommended):"
+        echo "  1. Copy $DIST_DIR/$JAR_NAME to your ImageJ plugins folder"
+        echo "  2. Restart ImageJ"
+        echo ""
+        echo "Alternative install (legacy):"
+        echo "  - Copy all Conf405_488*.class files to your ImageJ plugins folder"
+        echo ""
+        ls -lh "$DIST_DIR/$JAR_NAME"
+    else
+        echo "JAR packaging failed!"
+        exit 1
+    fi
 else
     echo "Build failed!"
     exit 1
