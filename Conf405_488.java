@@ -119,9 +119,7 @@ public class Conf405_488 implements PlugIn {
                 "3. Review and adjust ROIs for each image\n" +
                 "4. Measurements saved automatically\n\n" +
                 "Output:\n" +
-                "- Results405.csv (cell detections)\n" +
-                "- Results_raw.csv (raw conf488)\n" +
-                "- Results_thresh.csv (thresholded conf488)\n" +
+                "- Results_all.csv (combined conf488 raw + threshold)\n" +
                 "- ROIset.zip (saved ROIs)";
         
         IJ.showMessage("About Conf405/488 Plugin", helpText);
@@ -202,6 +200,8 @@ public class Conf405_488 implements PlugIn {
         IJ.log("Found " + list.length + " conf405 image(s)");
         IJ.log("Matching files:");
 
+        ResultsTable combinedResults = new ResultsTable();
+
         int processedCount = 0;
         int skippedCount = 0;
 
@@ -257,7 +257,7 @@ public class Conf405_488 implements PlugIn {
             // Process this image pair
             IJ.log("    Starting processing for pair " + numberPart);
             try {
-                processImagePair(conf405Path, conf488Path, numberPart, outDir);
+                processImagePair(conf405Path, conf488Path, numberPart, outDir, combinedResults);
                 processedCount++;
                 IJ.log("    Successfully completed pair " + numberPart);
             } catch (Exception e) {
@@ -278,20 +278,30 @@ public class Conf405_488 implements PlugIn {
             IJ.log("Skipped: " + skippedCount + " image pair(s)");
         }
         IJ.log("Results saved in: " + outDir);
+
+        if (combinedResults.size() > 0) {
+            String combinedPath = outDir + "Results_all.csv";
+            try {
+                combinedResults.save(combinedPath);
+                IJ.log("Combined results saved to: " + combinedPath);
+            } catch (Exception e) {
+                IJ.log("Failed to save combined results: " + e.getMessage());
+            }
+        }
         
         String statusMsg = processingCancelled ? "Processing Cancelled" : "Processing Complete";
         IJ.showMessage(statusMsg, 
             "Processed: " + processedCount + " image pair(s)\n" +
             (skippedCount > 0 ? "Skipped: " + skippedCount + " image pair(s)\n" : "") +
             (processingCancelled ? "Stopped by user request\n" : "") +
-            "Results saved in:\n" + outDir);
+                "Results saved in:\n" + outDir);
     }
 
     // ================================
     // Process Single Image Pair
     // ================================
     private void processImagePair(String conf405Path, String conf488Path, 
-                                  String identifier, String outDir) {
+                                  String identifier, String outDir, ResultsTable combinedResults) {
         
         IJ.log("\n--- Processing: " + identifier + " ---");
 
@@ -434,8 +444,6 @@ public class Conf405_488 implements PlugIn {
             IJ.log("Warning: No ROIs to save for " + identifier);
         }
 
-        // Save conf405 results
-        IJ.saveAs("Results", imageFolder + "Results405.csv");
         imp405.changes = false; // Prevent save dialog
         imp405.close();
 
@@ -456,13 +464,19 @@ public class Conf405_488 implements PlugIn {
 
         // Set measurement options
         IJ.run("Set Measurements...", 
-               "area mean integrated area_fraction redirect=None decimal=3");
+             "area mean integrated area_fraction raw redirect=None decimal=3");
 
         // ---- 1: Raw measurement ----
         IJ.log("Measuring raw conf488 intensities...");
         IJ.run("Clear Results");
         rm.runCommand(imp488, "Measure");
-        IJ.saveAs("Results", imageFolder + "Results_raw.csv");
+        ResultsTable rawRt = ResultsTable.getResultsTable();
+        int rawCount = rawRt.size();
+        double[] rawArea = getColumnValues(rawRt, new String[]{"Area"});
+        double[] rawMean = getColumnValues(rawRt, new String[]{"Mean"});
+        double[] rawIntDen = getColumnValues(rawRt, new String[]{"IntDen"});
+        double[] rawAreaPct = getColumnValues(rawRt, new String[]{"%Area", "AreaFrac", "AreaFraction"});
+        double[] rawRawIntDen = getColumnValues(rawRt, new String[]{"RawIntDen", "RawInt"});
 
         // ---- 2: Thresholded measurement ----
         IJ.log("Measuring thresholded conf488 intensities...");
@@ -470,7 +484,25 @@ public class Conf405_488 implements PlugIn {
         IJ.run(imp488, "Convert to Mask", "");
         IJ.run("Clear Results");
         rm.runCommand(imp488, "Measure");
-        IJ.saveAs("Results", imageFolder + "Results_thresh.csv");
+        ResultsTable threshRt = ResultsTable.getResultsTable();
+        int threshCount = threshRt.size();
+        double[] threshArea = getColumnValues(threshRt, new String[]{"Area"});
+        double[] threshMean = getColumnValues(threshRt, new String[]{"Mean"});
+        double[] threshIntDen = getColumnValues(threshRt, new String[]{"IntDen"});
+        double[] threshAreaPct = getColumnValues(threshRt, new String[]{"%Area", "AreaFrac", "AreaFraction"});
+        double[] threshRawIntDen = getColumnValues(threshRt, new String[]{"RawIntDen", "RawInt"});
+
+        int rowCount = Math.min(rawCount, threshCount);
+        if (rawCount != threshCount) {
+            IJ.log("Warning: Raw/Threshold row count mismatch for " + identifier +
+                   " (raw=" + rawCount + ", thresh=" + threshCount + ")");
+        }
+
+        for (int i = 0; i < rowCount; i++) {
+            addCombinedRow(combinedResults, identifier, i + 1,
+                    rawArea[i], rawMean[i], rawIntDen[i], rawAreaPct[i], rawRawIntDen[i],
+                    threshArea[i], threshMean[i], threshIntDen[i], threshAreaPct[i], threshRawIntDen[i]);
+        }
 
         imp488.changes = false; // Prevent save dialog
         imp488.close();
@@ -480,6 +512,48 @@ public class Conf405_488 implements PlugIn {
         IJ.run("Clear Results");
 
         IJ.log("Successfully processed: " + identifier);
+    }
+
+    // ================================
+    // Helper: Collect measurement columns safely
+    // ================================
+    private double[] getColumnValues(ResultsTable rt, String[] possibleNames) {
+        int rowCount = rt.size();
+        double[] values = new double[rowCount];
+        for (int i = 0; i < rowCount; i++) {
+            values[i] = getValueFromTable(rt, i, possibleNames);
+        }
+        return values;
+    }
+
+    private double getValueFromTable(ResultsTable rt, int row, String[] possibleNames) {
+        for (String name : possibleNames) {
+            if (rt.getColumnIndex(name) >= 0) {
+                return rt.getValue(name, row);
+            }
+        }
+        return Double.NaN;
+    }
+
+    private void addCombinedRow(ResultsTable combined, String identifier, int roiIndex,
+                                double rawArea, double rawMean, double rawIntDen, double rawAreaPct, double rawRawIntDen,
+                                double threshArea, double threshMean, double threshIntDen, double threshAreaPct, double threshRawIntDen) {
+        int row = combined.getCounter();
+        combined.incrementCounter();
+        combined.setLabel(identifier, row);
+        combined.addValue("ROI", roiIndex);
+
+        combined.addValue("Raw_Area", rawArea);
+        combined.addValue("Raw_Mean", rawMean);
+        combined.addValue("Raw_IntDen", rawIntDen);
+        combined.addValue("Raw_%Area", rawAreaPct);
+        combined.addValue("Raw_RawIntDen", rawRawIntDen);
+
+        combined.addValue("Thresh_Area", threshArea);
+        combined.addValue("Thresh_Mean", threshMean);
+        combined.addValue("Thresh_IntDen", threshIntDen);
+        combined.addValue("Thresh_%Area", threshAreaPct);
+        combined.addValue("Thresh_RawIntDen", threshRawIntDen);
     }
 
     // ================================
