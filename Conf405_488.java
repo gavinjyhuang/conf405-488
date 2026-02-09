@@ -32,6 +32,10 @@ public class Conf405_488 implements PlugIn {
     private static final int MIN_PARTICLE_SIZE = 100;
     private static final String THRESHOLD_METHOD = "Default dark no-reset";
     private volatile boolean processingCancelled = false;
+    private Double manualThreshMin = null;
+    private Double manualThreshMax = null;
+    private Double manual488ThreshMin = null;
+    private Double manual488ThreshMax = null;
     
     @Override
     public void run(String arg) {
@@ -135,6 +139,8 @@ public class Conf405_488 implements PlugIn {
             IJ.log("FATAL ERROR in processConfImages: " + t.getClass().getName() + ": " + t.getMessage());
             t.printStackTrace();
             IJ.showMessage("Fatal Error", "A fatal error occurred:\n" + t.getMessage());
+        } finally {
+            IJ.run("Close All");
         }
     }
     
@@ -331,7 +337,28 @@ public class Conf405_488 implements PlugIn {
         imp405.show();
 
         IJ.log("Detecting cells...");
-        IJ.setAutoThreshold(imp405, THRESHOLD_METHOD);
+
+        if (manualThreshMin == null || manualThreshMax == null) {
+            IJ.log("Waiting for user to set threshold on conf405...");
+            IJ.run(imp405, "Threshold...", "");
+            WaitForUserDialog threshDialog = new WaitForUserDialog(
+                    "Set Threshold",
+                    "Adjust the threshold on the conf405 image, then click OK to use it for all images."
+            );
+            threshDialog.show();
+
+            ImageProcessor ip = imp405.getProcessor();
+            double minT = ip.getMinThreshold();
+            double maxT = ip.getMaxThreshold();
+            if (minT == ImageProcessor.NO_THRESHOLD || maxT == ImageProcessor.NO_THRESHOLD) {
+                throw new RuntimeException("No threshold set. Please set a threshold and click OK.");
+            }
+            manualThreshMin = minT;
+            manualThreshMax = maxT;
+            IJ.log("Using manual threshold for run: min=" + manualThreshMin + ", max=" + manualThreshMax);
+        }
+
+        IJ.setThreshold(imp405, manualThreshMin, manualThreshMax);
         IJ.run(imp405, "Options...", "iterations=1 count=1 black do=nothing");
         IJ.run(imp405, "Convert to Mask", "");
         IJ.run(imp405, "Fill Holes", "");
@@ -480,7 +507,27 @@ public class Conf405_488 implements PlugIn {
 
         // ---- 2: Thresholded measurement ----
         IJ.log("Measuring thresholded conf488 intensities...");
-        IJ.setAutoThreshold(imp488, THRESHOLD_METHOD);
+        if (manual488ThreshMin == null || manual488ThreshMax == null) {
+            IJ.log("Waiting for user to set threshold on conf488...");
+            IJ.run(imp488, "Threshold...", "");
+            WaitForUserDialog threshDialog = new WaitForUserDialog(
+                    "Set Threshold",
+                    "Adjust the threshold on the conf488 image, then click OK to use it for all images."
+            );
+            threshDialog.show();
+
+            ImageProcessor ip = imp488.getProcessor();
+            double minT = ip.getMinThreshold();
+            double maxT = ip.getMaxThreshold();
+            if (minT == ImageProcessor.NO_THRESHOLD || maxT == ImageProcessor.NO_THRESHOLD) {
+                throw new RuntimeException("No threshold set. Please set a threshold and click OK.");
+            }
+            manual488ThreshMin = minT;
+            manual488ThreshMax = maxT;
+            IJ.log("Using manual conf488 threshold for run: min=" + manual488ThreshMin + ", max=" + manual488ThreshMax);
+        }
+
+        IJ.setThreshold(imp488, manual488ThreshMin, manual488ThreshMax);
         IJ.run(imp488, "Convert to Mask", "");
         IJ.run("Clear Results");
         rm.runCommand(imp488, "Measure");
